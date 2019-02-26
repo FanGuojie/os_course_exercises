@@ -3,7 +3,7 @@
         "path": "README.md",
         "title": "介绍" },
     "plugins": [
-        "quiz","mcqx","fbqx","duoshuo", "spoiler","-lunr", "-search", "search-pro"
+        "quiz","mcqx","fbqx","duoshuo", "spoiler","-lunr", "-search", "search-pro","fontsettings"
     ],
     "pluginsConfig": {
         "duoshuo": {
