@@ -8,39 +8,125 @@
 
 1. 为什么讲基本原理时先讲进程后讲线程，而在做实验时先做线程后做进程？
 
- > 实现会容易：只需要实现PCB中的子集TCB，不用关注PCB中的资源管理部分；
+因为线程更容易实现
 
 2. ucore的线程控制块数据结构是什么？
 
- > 在ucore中只有一个PCB数据结构，进程和线程都使用这一个数据结构；
+   lcb线程控制块
+
+   但在ucore中，进程和线程都使用pcb数据结构
 
 ### 13.2 关键数据结构
 
 1. 分析proc_struct数据结构，说明每个字段的用途，是线程控制块或进程控制块的，会在哪些函数中修改。
 
- > 寄存器状态、堆栈、当前指令指针等信息是线程控制块的；
- 
- > mm, vma等内存管理字段是进程控制块的；
+   ```C
+   struct proc_struct {    
+   	enum proc_state state;                      // Process state
+       int pid;                                    // Process ID
+       int runs;                                   // the running times of Proces
+       uintptr_t kstack;                           // Process kernel stack
+       volatile bool need_resched;                 // bool value: need to be rescheduled to release CPU?
+       struct proc_struct *parent;                 // the parent process
+       struct mm_struct *mm;                       // Process's memory management field
+       struct context context;                     // Switch here to run process
+       struct trapframe *tf;                       // Trap frame for current interrupt
+       uintptr_t cr3;                              // CR3 register: the base addr of Page Directroy Table(PDT)
+       uint32_t flags;                             // Process flag
+       char name[PROC_NAME_LEN + 1];               // Process name
+       list_entry_t list_link;                     // Process link list 
+       list_entry_t hash_link;                     // Process hash list
+   };
+   ```
+
+   共用的：
+
+   pid ,runs ,state,need_resched，name，list_link，hash_link
+
+   线程相关：
+
+   kstack, context, flags,
+
+   进程相关：
+
+   mm，parent，tf，cr3
 
 1. 如何知道ucore的两个线程同在一个进程？
 
- > 查看线程控制块中cr3是否一致；
+   同一个进程的不同线程共用页表，因而可以查看cr3中页基址是否相同
 
 1. context和trapframe分别在什么时候用到？
 
- > trapframe在中断响应时用到；context在线程切换时用到；
+   trapframe在中断响应时用到；context在线程切换时用到；
 
-1. 用户态或内核态下的中断处理有什么区别？在trapframe中有什么体现？
+2. 用户态或内核态下的中断处理有什么区别？在trapframe中有什么体现？
 
- > 在用户态中断响应时，要切换到内核态；而在内核态中断响应时，没有这种切换；
- 
- > tf_esp, tf_ss字段
+   在用户态中断响应时，要切换到内核态；而在内核态中断响应时，没有这种切换；
 
-1. 分析trapframe数据结构，说明每个字段的用途，是由硬件或软件保存的，在内核态中断响应时是否会保存。
+   tf_esp, tf_ss字段
 
- > tf_eip, tf_cs等由硬件保存；tf_esp, tf_ss等在用户态响应时由硬件保存；
- 
- > 通用寄存器由软件保存；( lab4/kern/trap/trapentry.S )
+3. 分析trapframe数据结构，说明每个字段的用途，是由硬件或软件保存的，在内核态中断响应时是否会保存。
+
+```C
+struct trapframe {
+    struct pushregs tf_regs;
+    uint16_t tf_gs;
+    uint16_t tf_padding0;
+    uint16_t tf_fs;
+    uint16_t tf_padding1;
+    uint16_t tf_es;
+    uint16_t tf_padding2;
+    uint16_t tf_ds;
+    uint16_t tf_padding3;
+    uint32_t tf_trapno;
+    /* below here defined by x86 hardware */
+    uint32_t tf_err;
+    uintptr_t tf_eip;
+    uint16_t tf_cs;
+    uint16_t tf_padding4;
+    uint32_t tf_eflags;
+    /* below here only when crossing rings, such as from user to kernel */
+    uintptr_t tf_esp;
+    uint16_t tf_ss;
+    uint16_t tf_padding5;
+} __attribute__((packed));
+```
+
+
+
+trapframe存储了需要保存的数据段寄存器和指令段寄存器，以及指示堆栈位置相关的寄存器
+
+硬件相关的
+
+```c
+    /* below here defined by x86 hardware */
+    uint32_t tf_err;
+    uintptr_t tf_eip;
+    uint16_t tf_cs;
+    uint16_t tf_padding4;
+    uint32_t tf_eflags;
+    /* below here only when crossing rings, such as from user to kernel */
+    uintptr_t tf_esp;
+    uint16_t tf_ss;
+    uint16_t tf_padding5;
+```
+
+
+
+软件相关的
+
+```C
+    struct pushregs tf_regs;
+    uint16_t tf_gs;
+    uint16_t tf_padding0;
+    uint16_t tf_fs;
+    uint16_t tf_padding1;
+    uint16_t tf_es;
+    uint16_t tf_padding2;
+    uint16_t tf_ds;
+    uint16_t tf_padding3;
+    uint32_t tf_trapno;
+```
 
 ### 13.3 执行流程
 
@@ -75,7 +161,7 @@
 8. 分析内核线程initproc的创建流程，说明线程切换后执行的第一条是什么。
 
  > 
- 
+
 ## 小组练习与思考题
 
 (1)(spoc) 理解内核线程的生命周期。
